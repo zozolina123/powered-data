@@ -1,10 +1,16 @@
 const moment = require('moment');
+const cors = require('cors');
 moment.defaultFormat = "DD.MM";
 const express = require('express');
 const app = express();
 const port = 3001;
+app.use(cors())
 
+const { generateMockData, mapPrevNextData } = require('./utils');
 const data = generateConsumptionData();
+var monthNames = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+];
 
 function generateConsumptionData() {
     const monthsArray = moment.months();
@@ -13,19 +19,12 @@ function generateConsumptionData() {
     let endDate = startDate.clone().endOf('month');
     endDate.add(1, 'days');
 
-    monthsArray.forEach(month => {
+    monthsArray.forEach((month) => {
         data[month] = {};
-        while (startDate.format(moment.defaultFormat) != endDate.format(moment.defaultFormat)) {
-            const fromArray = [];
-            for (let i = 0; i < 23; i++) {
-                fromArray.push(Math.random());
-            }
-            data[month][startDate.format(moment.defaultFormat)] = fromArray;
-            startDate = startDate.clone().add(1, 'days')
-        }
-        endDate = startDate.clone().endOf('month');
-        endDate.add(1, 'days');
-    })
+        generateMockData(startDate, data, month);
+        startDate.endOf('month').add(1, 'days');
+    });
+    data['January']['1'][0] = data['December'][31][23];
 
     return data;
 
@@ -43,15 +42,37 @@ app.get('/month/:monthName', (req, res) => {
         error: "Month name invalid"
     })
 })
-app.get('/:monthName/:day', (req, res) => {
-    const month = moment().month(req.params.monthName).format("M");
-    const key = `${req.params.day < 10 ? "0" : ''}${req.params.day}.${month < 10 ? "0" : ''}${month}`;
 
-    if (data[req.params.monthName] && data[req.params.monthName][key]) {
-        return res.send(data[req.params.monthName][key]);
+app.get('/week/:monthName/:day', (req, res) => {
+    // const startDate = new Date(req.params.weekStartDate)
+    const str = new Date().getFullYear() + '-' + req.params.monthName + '-' + req.params.day;
+    const parsedDate = moment(str, 'YYYY-MMMM-DD');
+    const weekData = [];
+
+    if (!data[monthNames[parsedDate.month()]] || !data[monthNames[parsedDate.month()]][parsedDate.date()]) {
+        return res.send({
+            error: "Start date invalid"
+        })
     }
+
+    weekData.push(data[monthNames[parsedDate.month()]][parsedDate.date()]);
+    for (let i = 0; i < 6; i++) {
+        parsedDate.add('1', 'days');
+        weekData.push(data[monthNames[parsedDate.month()]][parsedDate.date()]);
+        console.log(parsedDate.month())
+        console.log(parsedDate.date())
+    }
+    return res.send(weekData);
+
+})
+app.get('/:monthName/:day', (req, res) => {
+    if (data[req.params.monthName] && data[req.params.monthName][req.params.day]) {
+        // mapPrevNextData(data[req.params.monthName][key], req.params.monthName, key)
+        return res.send(data[req.params.monthName][req.params.day]);
+    }
+
     return res.send({
-        error: "Month name or dayy number invalid"
+        error: "Month name or day number invalid"
     })
 })
 
