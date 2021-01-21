@@ -8,14 +8,16 @@ app.use(cors())
 
 const { generateMockData, mapPrevNextData } = require('./utils');
 const data = generateConsumptionData();
-var monthNames = ["January", "February", "March", "April", "May", "June",
+const monthNames = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
 ];
+
+const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function generateConsumptionData() {
     const monthsArray = moment.months();
     const data = {};
-    let startDate = moment(new Date(2020, 1, 1), moment.defaultFormat).subtract(1, 'month');
+    let startDate = moment(new Date(2021, 1, 1), moment.defaultFormat).subtract(1, 'month');
     let endDate = startDate.clone().endOf('month');
     endDate.add(1, 'days');
 
@@ -34,6 +36,48 @@ app.get('/', (req, res) => {
     res.send(data);
 })
 
+app.get('/overview/month', (req, res) => {
+    const monthOverview = [];
+    let monthData;
+    Object.keys(data).forEach(monthName => {
+        monthData = 0;
+        Object.keys(data[monthName]).forEach(dayNumber => {
+            const dayData = data[monthName][dayNumber].reduce((sum, val) => sum = sum + val);
+            monthData = monthData + dayData;
+        })
+        monthOverview.push(monthData);
+    })
+    res.send(monthOverview);
+})
+
+app.get('/overview/hour', (req, res) => {
+    const hourOverview = {};
+    Object.keys(data).forEach(monthName => {
+        Object.keys(data[monthName]).forEach(dayNumber => {
+            data[monthName][dayNumber].forEach((val, index) => {
+                if (!!!hourOverview[index]) hourOverview[index] = 0;
+                hourOverview[index] = hourOverview[index] + val
+            });
+        })
+    })
+    res.send(hourOverview);
+})
+
+app.get('/overview/day', (req, res) => {
+    const dayOverview = {};
+    Object.keys(data).forEach(monthName => {
+        Object.keys(data[monthName]).forEach(dayNumber => {
+            const weekdayNumber = moment(dayNumber + '-' + monthName + '2021', 'YYYY-MMMM-DD').day();
+            const weekdayName = dayNames[weekdayNumber];
+            data[monthName][dayNumber].forEach((val, index) => {
+                if (!!!dayOverview[weekdayName]) dayOverview[weekdayName] = 0;
+                dayOverview[weekdayName] = dayOverview[weekdayName] + val;
+            });
+        })
+    })
+    res.send(dayOverview);
+})
+
 app.get('/month/:monthName', (req, res) => {
     if (data[req.params.monthName]) {
         return res.send(data[req.params.monthName]);
@@ -44,7 +88,6 @@ app.get('/month/:monthName', (req, res) => {
 })
 
 app.get('/week/:monthName/:day', (req, res) => {
-    // const startDate = new Date(req.params.weekStartDate)
     const str = new Date().getFullYear() + '-' + req.params.monthName + '-' + req.params.day;
     const parsedDate = moment(str, 'YYYY-MMMM-DD');
     const weekData = [];
@@ -59,8 +102,6 @@ app.get('/week/:monthName/:day', (req, res) => {
     for (let i = 0; i < 6; i++) {
         parsedDate.add('1', 'days');
         weekData.push(data[monthNames[parsedDate.month()]][parsedDate.date()]);
-        console.log(parsedDate.month())
-        console.log(parsedDate.date())
     }
     return res.send(weekData);
 
@@ -75,6 +116,7 @@ app.get('/:monthName/:day', (req, res) => {
         error: "Month name or day number invalid"
     })
 })
+
 
 app.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`)
