@@ -37,7 +37,7 @@ app.get('/', (req, res) => {
 })
 
 app.get('/overview/month', (req, res) => {
-    const monthOverview = [];
+    const monthOverview = {};
     let monthData;
     Object.keys(data).forEach(monthName => {
         monthData = 0;
@@ -45,21 +45,23 @@ app.get('/overview/month', (req, res) => {
             const dayData = data[monthName][dayNumber].reduce((sum, val) => sum = sum + val);
             monthData = monthData + dayData;
         })
-        monthOverview.push(monthData);
+        monthOverview[monthName] = monthData;
     })
     res.send(monthOverview);
 })
 
 app.get('/overview/hour', (req, res) => {
     const hourOverview = {};
+    let hourCounter = 0;
     Object.keys(data).forEach(monthName => {
         Object.keys(data[monthName]).forEach(dayNumber => {
             data[monthName][dayNumber].forEach((val, index) => {
                 if (!!!hourOverview[index]) hourOverview[index] = 0;
-                hourOverview[index] = hourOverview[index] + val
+                hourOverview[index] = hourOverview[index] + val;
             });
         })
     })
+    Object.keys(hourOverview).forEach(hour => hourOverview[hour] = hourOverview[hour] / 365);
     res.send(hourOverview);
 })
 
@@ -75,6 +77,7 @@ app.get('/overview/day', (req, res) => {
             });
         })
     })
+    Object.keys(dayOverview).forEach(day => dayOverview[day] = dayOverview[day] / 43);
     res.send(dayOverview);
 })
 
