@@ -2,9 +2,22 @@ const moment = require('moment');
 const cors = require('cors');
 moment.defaultFormat = "DD.MM";
 const express = require('express');
+const fs = require('fs/promises');
 const app = express();
 const port = process.env.PORT || 3001;
 app.use(cors())
+const admin = require('firebase-admin');
+let latestFile = "";
+
+const serviceAccount = require('../gcloud-key.json');
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    storageBucket: "licenta-data.appspot.com"
+});
+
+const db = admin.firestore();
+const bucket = admin.storage().bucket();
 
 const { generateMockData, mapPrevNextData } = require('./utils');
 const data = generateConsumptionData();
@@ -14,7 +27,16 @@ const monthNames = ["January", "February", "March", "April", "May", "June",
 
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-function generateConsumptionData() {
+async function processReading(entryName, fileSaveName) {
+    const destFileName = 'latest.jpg'
+    var file = await bucket.file(latestFile).download({
+        destination: destFileName,
+    });
+    console.log(`downloaded file to ${destFileName}`)
+
+}
+
+async function generateConsumptionData() {
     const monthsArray = moment.months();
     const data = {};
     let startDate = moment(new Date(2021, 1, 1), moment.defaultFormat).subtract(1, 'month');
@@ -31,6 +53,24 @@ function generateConsumptionData() {
     return data;
 
 }
+
+let initState = true;
+db.collection('readings').onSnapshot(querySnapshot => {
+    console.log(`Received query snapshot of size ${querySnapshot.size}`);
+    if (initState) {
+        initState = false;
+    } else {
+        querySnapshot.docChanges().forEach(change => {
+            if (change.type === 'added') {
+                console.log('New reading: ', change.doc.data());
+                latestFile = change.doc.data().date;
+                processReading(latestFile)
+            }
+        }, err => {
+            console.log(`Encountered error: ${err}`);
+        });
+    }
+});
 
 app.get('/', (req, res) => {
     res.send(data);
